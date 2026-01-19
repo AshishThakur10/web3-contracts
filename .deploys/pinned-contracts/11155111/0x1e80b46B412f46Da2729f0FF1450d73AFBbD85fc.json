@@ -1,0 +1,21 @@
+{
+  "name": "hello_world",
+  "address": "0x1e80b46B412f46Da2729f0FF1450d73AFBbD85fc",
+  "abi": [
+    {
+      "inputs": [],
+      "name": "message",
+      "outputs": [
+        {
+          "internalType": "string",
+          "name": "",
+          "type": "string"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ],
+  "filePath": "default_workspace/contracts/hello_world.sol",
+  "pinnedAt": 1767856544727
+}
