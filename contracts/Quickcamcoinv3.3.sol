@@ -45,7 +45,6 @@ contract QuickCamCoin is ERC20, ERC20Pausable, AccessControl {
     uint256 public thresholdsLength;
 
 
-
     constructor(address defaultAdmin, address admin, address pauser, address minter, address burner, address operational, address _ethUsdFeed)
         ERC20("QuickCam Coin", "QCC") 
     {
@@ -84,10 +83,10 @@ contract QuickCamCoin is ERC20, ERC20Pausable, AccessControl {
         _burn(from, amount);
     }
 
+ 
     // packages and throush hold details. 
  
-
-    function addThreshold(uint256 threshold, uint256 price) external onlyRole(BURNER_ROLE) {
+    function addThreshold(uint256 threshold, uint256 price) external onlyRole(DEFAULT_ADMIN_ROLE) {
         if (thresholdsLength > 0) {
             require(
                 threshold > totalSupplyThresholds[thresholdsLength - 1],
@@ -99,6 +98,13 @@ contract QuickCamCoin is ERC20, ERC20Pausable, AccessControl {
         thresholdPriceMap[threshold] = price;
 
         thresholdsLength++;
+    }
+
+    function getActivePrice() public view returns (uint256) {
+        if (thresholdsLength == 0) return 0;
+
+        uint256 key = totalSupplyThresholds[currentThresholdIndex];
+        return thresholdPriceMap[key];
     }
 
 
