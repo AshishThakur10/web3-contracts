@@ -45,7 +45,7 @@ contract QuickCamCoin is ERC20, ERC20Pausable, AccessControl {
     uint256 public thresholdsLength;
 
 
-    constructor(address defaultAdmin, address admin, address pauser, address minter, address burner, address operational, address _ethUsdFeed)
+    constructor(address defaultAdmin, address admin, address operational, address pauser, address minter, address burner, address _ethUsdFeed)
         ERC20("QuickCam Coin", "QCC") 
     {
 
@@ -100,11 +100,32 @@ contract QuickCamCoin is ERC20, ERC20Pausable, AccessControl {
         thresholdsLength++;
     }
 
+    function _getActiveQccPriceUsd() internal view returns (uint256) {
+        if (thresholdsLength == 0) {
+            return QCC_PRICE_USD; // fallback
+        }
+
+        uint256 key = totalSupplyThresholds[currentThresholdIndex];
+        return thresholdPriceMap[key];
+    }
+
+
     function getActivePrice() public view returns (uint256) {
         if (thresholdsLength == 0) return 0;
 
         uint256 key = totalSupplyThresholds[currentThresholdIndex];
         return thresholdPriceMap[key];
+    }
+
+    
+
+    function _updateThresholdIndex(uint256 newTotalSupply) internal {
+        while (
+            currentThresholdIndex + 1 < thresholdsLength &&
+            newTotalSupply >= totalSupplyThresholds[currentThresholdIndex + 1]
+        ) {
+            currentThresholdIndex++;
+        }
     }
 
 
@@ -116,7 +137,8 @@ contract QuickCamCoin is ERC20, ERC20Pausable, AccessControl {
         return uint256(price) * 1e10;
     }
 
-    function _processPurchase(address to, uint256 ethAmount) internal {
+
+    function _processPurchaseOld(address to, uint256 ethAmount) internal {
         require(ethAmount > 0, "Send ETH");
         require(to != address(0), "Invalid address");
 
@@ -125,12 +147,80 @@ contract QuickCamCoin is ERC20, ERC20Pausable, AccessControl {
         // ETH sent → USD value
         uint256 usdValue = (ethAmount * ethUsdPrice) / 1e18;
 
+        // 
+        uint256 activePriceUsd = _getActiveQccPriceUsd();
+
         // USD → QCC amount
-        uint256 qccAmount = (usdValue * 1e18) / QCC_PRICE_USD;
+        uint256 qccAmount = (usdValue * 1e18) / activePriceUsd;
 
         _mint(to, qccAmount);
 
+         // update threshold after supply change
+        _updateThresholdIndex(totalSupply());
+
         emit TokensPurchased(to, ethAmount, qccAmount);
+    }
+
+
+    function _processPurchase(address to, uint256 ethAmount) internal {
+        require(ethAmount > 0, "Send ETH");
+        require(to != address(0), "Invalid address");
+
+        uint256 ethUsdPrice = _getEthUsdPrice();
+        uint256 usdRemaining = (ethAmount * ethUsdPrice) / 1e18;
+
+        uint256 supply = totalSupply();
+        uint256 idx = currentThresholdIndex;
+        uint256 qccMintedTotal = 0;
+
+        while (usdRemaining > 0) {
+            uint256 priceUsd;
+
+            if (thresholdsLength == 0) {
+                priceUsd = QCC_PRICE_USD;
+            } else {
+                uint256 key = totalSupplyThresholds[idx];
+                priceUsd = thresholdPriceMap[key];
+            }
+
+            // Next threshold supply limit
+            uint256 nextThresholdSupply = (
+                idx + 1 < thresholdsLength
+                    ? totalSupplyThresholds[idx + 1]
+                    : type(uint256).max
+            );
+
+            uint256 supplyLeftInTier = nextThresholdSupply - supply;
+
+            // Max QCC purchasable in this tier
+            uint256 maxQccInTier = (usdRemaining * 1e18) / priceUsd;
+
+            uint256 qccToMint = maxQccInTier > supplyLeftInTier
+                ? supplyLeftInTier
+                : maxQccInTier;
+
+            // USD actually used in this tier
+            uint256 usdUsed = (qccToMint * priceUsd) / 1e18;
+
+            usdRemaining -= usdUsed;
+            supply += qccToMint;
+            qccMintedTotal += qccToMint;
+
+            // Move to next tier if crossed
+            if (supply == nextThresholdSupply && idx + 1 < thresholdsLength) {
+                idx++;
+            } else {
+                break;
+            }
+        }
+
+        require(qccMintedTotal > 0, "Zero QCC");
+
+        _mint(to, qccMintedTotal);
+
+        currentThresholdIndex = idx;
+
+        emit TokensPurchased(to, ethAmount, qccMintedTotal);
     }
 
 
