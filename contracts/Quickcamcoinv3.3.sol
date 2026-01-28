@@ -11,7 +11,7 @@ import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 
 contract QuickCamCoin is ERC20, ERC20Pausable, AccessControl {
 
-    bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
+    // bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
     bytes32 public constant BURNER_ROLE = keccak256("BURNER_ROLE");
@@ -45,13 +45,13 @@ contract QuickCamCoin is ERC20, ERC20Pausable, AccessControl {
     uint256 public thresholdsLength;
 
 
-    constructor(address defaultAdmin, address admin, address operational, address pauser, address minter, address burner, address _ethUsdFeed)
+    constructor(address defaultAdmin, address operational, address pauser, address minter, address burner, address _ethUsdFeed)
         ERC20("QuickCam Coin", "QCC") 
     {
 
         _grantRole(DEFAULT_ADMIN_ROLE, defaultAdmin);
 
-        _grantRole(ADMIN_ROLE, admin);
+        // _grantRole(ADMIN_ROLE, admin);
 
         _grantRole(PAUSER_ROLE, pauser);
         _grantRole(MINTER_ROLE, minter);
@@ -138,28 +138,28 @@ contract QuickCamCoin is ERC20, ERC20Pausable, AccessControl {
     }
 
 
-    function _processPurchaseOld(address to, uint256 ethAmount) internal {
-        require(ethAmount > 0, "Send ETH");
-        require(to != address(0), "Invalid address");
+    // function _processPurchaseOld(address to, uint256 ethAmount) internal {
+    //     require(ethAmount > 0, "Send ETH");
+    //     require(to != address(0), "Invalid address");
 
-        uint256 ethUsdPrice = _getEthUsdPrice();
+    //     uint256 ethUsdPrice = _getEthUsdPrice();
 
-        // ETH sent → USD value
-        uint256 usdValue = (ethAmount * ethUsdPrice) / 1e18;
+    //     // ETH sent → USD value
+    //     uint256 usdValue = (ethAmount * ethUsdPrice) / 1e18;
 
-        // 
-        uint256 activePriceUsd = _getActiveQccPriceUsd();
+    //     // 
+    //     uint256 activePriceUsd = _getActiveQccPriceUsd();
 
-        // USD → QCC amount
-        uint256 qccAmount = (usdValue * 1e18) / activePriceUsd;
+    //     // USD → QCC amount
+    //     uint256 qccAmount = (usdValue * 1e18) / activePriceUsd;
 
-        _mint(to, qccAmount);
+    //     _mint(to, qccAmount);
 
-         // update threshold after supply change
-        _updateThresholdIndex(totalSupply());
+    //      // update threshold after supply change
+    //     _updateThresholdIndex(totalSupply());
 
-        emit TokensPurchased(to, ethAmount, qccAmount);
-    }
+    //     emit TokensPurchased(to, ethAmount, qccAmount);
+    // }
 
 
     function _processPurchase(address to, uint256 ethAmount) internal {
@@ -172,8 +172,10 @@ contract QuickCamCoin is ERC20, ERC20Pausable, AccessControl {
         uint256 supply = totalSupply();
         uint256 idx = currentThresholdIndex;
         uint256 qccMintedTotal = 0;
+        uint256 safetyCounter = 0;  // Hard iteration cap
 
-        while (usdRemaining > 0) {
+        while (usdRemaining > 0 && safetyCounter < 10) {
+            safetyCounter++;
             uint256 priceUsd;
 
             if (thresholdsLength == 0) {
@@ -213,7 +215,7 @@ contract QuickCamCoin is ERC20, ERC20Pausable, AccessControl {
                 break;
             }
         }
-
+        require(safetyCounter < 10, "Too many tiers"); 
         require(qccMintedTotal > 0, "Zero QCC");
 
         _mint(to, qccMintedTotal);
@@ -224,8 +226,7 @@ contract QuickCamCoin is ERC20, ERC20Pausable, AccessControl {
     }
 
 
-    function updateQccPrice(uint256 newPriceUsd) external onlyRole(DEFAULT_ADMIN_ROLE)
-    {
+    function updateQccPrice(uint256 newPriceUsd) external onlyRole(DEFAULT_ADMIN_ROLE) {
         require(newPriceUsd > 0, "Invalid price");
         QCC_PRICE_USD = newPriceUsd;
     }

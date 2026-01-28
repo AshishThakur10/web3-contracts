@@ -11,7 +11,7 @@ contract QuickCamCoin is ERC20, ERC20Pausable, AccessControl {
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
 
     constructor(address defaultAdmin, address pauser, address minter)
-        ERC20("QuickCam Coin", "QCC")
+        ERC20("QuickCam Coin", "QCC") 
     {
         _grantRole(DEFAULT_ADMIN_ROLE, defaultAdmin);
         _grantRole(PAUSER_ROLE, pauser);
