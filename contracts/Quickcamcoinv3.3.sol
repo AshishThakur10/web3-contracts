@@ -28,6 +28,7 @@ contract QuickCamCoin is ERC20, ERC20Pausable, AccessControl {
     // QCC price in USD (18 decimals)
     // Example: 1 QCC = 1 USD → 1e18
     uint256 public QCC_PRICE_USD;
+    bool public isMintingEnabled;
 
 
     /* ------------------ THRESHOLD STORAGE ------------------ */
@@ -75,7 +76,12 @@ contract QuickCamCoin is ERC20, ERC20Pausable, AccessControl {
         _unpause(); 
     }
 
+    function setMintingEnable(bool _enabled) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        isMintingEnabled = _enabled;
+    }
+
     function mint(address to, uint256 amount) public onlyRole(MINTER_ROLE) whenNotPaused {
+        require(isMintingEnabled == true, "Minting is not enabled");
         _mint(to, amount);
     }
 
