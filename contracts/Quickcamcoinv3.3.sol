@@ -11,7 +11,6 @@ import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 
 contract QuickCamCoin is ERC20, ERC20Pausable, AccessControl {
 
-    // bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
     bytes32 public constant BURNER_ROLE = keccak256("BURNER_ROLE");
@@ -29,6 +28,8 @@ contract QuickCamCoin is ERC20, ERC20Pausable, AccessControl {
     // Example: 1 QCC = 1 USD → 1e18
     uint256 public QCC_PRICE_USD;
     bool public isMintingEnabled;
+    uint256 public soldSupply; // only increases via purchases
+
 
 
     /* ------------------ THRESHOLD STORAGE ------------------ */
@@ -144,30 +145,6 @@ contract QuickCamCoin is ERC20, ERC20Pausable, AccessControl {
     }
 
 
-    // function _processPurchaseOld(address to, uint256 ethAmount) internal {
-    //     require(ethAmount > 0, "Send ETH");
-    //     require(to != address(0), "Invalid address");
-
-    //     uint256 ethUsdPrice = _getEthUsdPrice();
-
-    //     // ETH sent → USD value
-    //     uint256 usdValue = (ethAmount * ethUsdPrice) / 1e18;
-
-    //     // 
-    //     uint256 activePriceUsd = _getActiveQccPriceUsd();
-
-    //     // USD → QCC amount
-    //     uint256 qccAmount = (usdValue * 1e18) / activePriceUsd;
-
-    //     _mint(to, qccAmount);
-
-    //      // update threshold after supply change
-    //     _updateThresholdIndex(totalSupply());
-
-    //     emit TokensPurchased(to, ethAmount, qccAmount);
-    // }
-
-
     function _processPurchase(address to, uint256 ethAmount) internal {
         require(ethAmount > 0, "Send ETH");
         require(to != address(0), "Invalid address");
@@ -175,10 +152,11 @@ contract QuickCamCoin is ERC20, ERC20Pausable, AccessControl {
         uint256 ethUsdPrice = _getEthUsdPrice();
         uint256 usdRemaining = (ethAmount * ethUsdPrice) / 1e18;
 
-        uint256 supply = totalSupply();
+        //uint256 supply = totalSupply();
+        uint256 supply = soldSupply;
         uint256 idx = currentThresholdIndex;
         uint256 qccMintedTotal = 0;
-        uint256 safetyCounter = 0;  // Hard iteration cap
+        uint256 safetyCounter = 0;  // max tiers per purchase to avoid gas exhaustion
 
         while (usdRemaining > 0 && safetyCounter < 10) {
             safetyCounter++;
@@ -224,7 +202,11 @@ contract QuickCamCoin is ERC20, ERC20Pausable, AccessControl {
         require(safetyCounter < 10, "Too many tiers"); 
         require(qccMintedTotal > 0, "Zero QCC");
 
+        soldSupply += qccMintedTotal;
+
         _mint(to, qccMintedTotal);
+
+      //  _updateThresholdIndex(soldSupply); // optional, keep currentThresholdIndex in sync  TODO: can be removed to save gasfee. 
 
         currentThresholdIndex = idx;
 
